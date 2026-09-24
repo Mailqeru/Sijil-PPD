@@ -344,6 +344,29 @@
     z-index:50;
   }
   .toast.show{opacity:1;bottom:32px;}
+
+  #printArea{display:none;}
+  @media print{
+    body > .wrap, body > .toast{ display:none !important; }
+    #printArea{
+      display:block !important;
+      position:absolute;
+      top:0; left:0;
+    }
+    #printArea .print-page{
+      width:210mm;
+      height:297mm;
+      page-break-after:always;
+      overflow:hidden;
+    }
+    #printArea .print-page:last-child{page-break-after:auto;}
+    #printArea .cert{
+      width:210mm !important;
+      height:297mm !important;
+      transform:none !important;
+    }
+    @page{ size:A4 portrait; margin:0; }
+  }
 </style>
 </head>
 <body>
@@ -492,6 +515,10 @@
           <span class="lbl">Pratonton untuk</span>
           <select id="previewPicker"></select>
         </label>
+        <div style="display:flex;gap:8px;">
+          <button class="ghost" id="prevRecip" style="flex:1;">◀ Sebelum</button>
+          <button class="ghost" id="nextRecip" style="flex:1;">Seterus ▶</button>
+        </div>
 
         <div style="margin-top:6px;">
           <button class="primary" id="genZip" style="width:100%;">Jana &amp; Muat Turun Semua (ZIP, PDF berasingan)</button>
@@ -499,6 +526,14 @@
         <div>
           <button class="ghost" id="genOnePdf" style="width:100%;">Muat Turun 1 PDF (semua muka surat)</button>
         </div>
+
+        <div style="border-top:1px solid var(--line);margin-top:8px;padding-top:14px;">
+          <p class="hint" style="margin:0 0 10px;"><strong>Cetak terus (macam mail merge Word)</strong></p>
+          <button class="subtle" id="printAll" style="width:100%;margin-bottom:8px;">🖨️ Cetak Semua Penerima</button>
+          <button class="subtle" id="printChecked" style="width:100%;margin-bottom:8px;">🖨️ Cetak Yang Ditanda Sahaja</button>
+          <button class="ghost" id="printOne" style="width:100%;">🖨️ Cetak Sijil Ini Sahaja</button>
+        </div>
+
         <div id="progressWrap" style="display:none;">
           <div class="progress-bar"><div id="progressFill"></div></div>
           <div class="progress-label" id="progressLabel"></div>
@@ -545,6 +580,8 @@
     Semua pemprosesan berlaku terus dalam pelayar anda — fail Excel dan data penerima tidak dimuat naik ke mana-mana pelayan.
   </footer>
 </div>
+
+<div id="printArea"></div>
 
 <div class="toast" id="toast"></div>
 
@@ -723,6 +760,21 @@
   });
 
   document.getElementById('previewPicker').addEventListener('change', refreshLivePreview);
+
+  document.getElementById('prevRecip').addEventListener('click', function(){
+    var picker = document.getElementById('previewPicker');
+    if(picker.selectedIndex > 0){
+      picker.selectedIndex -= 1;
+      refreshLivePreview();
+    }
+  });
+  document.getElementById('nextRecip').addEventListener('click', function(){
+    var picker = document.getElementById('previewPicker');
+    if(picker.selectedIndex < picker.options.length - 1){
+      picker.selectedIndex += 1;
+      refreshLivePreview();
+    }
+  });
 
   // ---------- excel import ----------
   var dropzone = document.getElementById('dropzone');
@@ -1064,6 +1116,46 @@
       });
     }
     step();
+  });
+
+  // ---------- print (direct, like Word mail merge) ----------
+  function buildPrintPages(list){
+    var printArea = document.getElementById('printArea');
+    printArea.innerHTML = '';
+    list.forEach(function(r){
+      var page = document.createElement('div');
+      page.className = 'print-page';
+      var certClone = document.getElementById('certLive').cloneNode(true);
+      certClone.removeAttribute('id');
+      fillCert(certClone, r);
+      page.appendChild(certClone);
+      printArea.appendChild(page);
+    });
+  }
+
+  function doPrint(list){
+    if(!list.length){ toast('Tiada penerima untuk dicetak.'); return; }
+    buildPrintPages(list);
+    document.fonts.ready.then(function(){
+      setTimeout(function(){ window.print(); }, 60);
+    });
+  }
+
+  window.addEventListener('afterprint', function(){
+    document.getElementById('printArea').innerHTML = '';
+  });
+
+  document.getElementById('printAll').addEventListener('click', function(){
+    var list = recipients.filter(function(r){ return r.nama && r.nama.trim(); });
+    doPrint(list);
+  });
+  document.getElementById('printChecked').addEventListener('click', function(){
+    doPrint(getSelectedRecipients());
+  });
+  document.getElementById('printOne').addEventListener('click', function(){
+    var r = currentPreviewRecipient();
+    if(!r){ toast('Tiada pratonton dipilih.'); return; }
+    doPrint([r]);
   });
 
   // ---------- init ----------
